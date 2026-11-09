@@ -1,15 +1,23 @@
 import { z } from 'zod';
 import { paginationQuerySchema } from '../common/pagination/pagination.js';
-import { booleanQuery, dayOfWeek, uniqueIdList } from '../common/schemas.js';
+import {
+  booleanQuery,
+  dayOfWeek,
+  providerIdQuery,
+  uniqueIdList,
+  uuid,
+} from '../common/schemas.js';
 
 /** Máximo de acompañantes por asignación. */
 export const MAX_COMPANIONS = 10;
 
 /** "Esta ruta, los lunes, la hace este chofer con estos acompañantes". */
 export const createScheduleSchema = z.strictObject({
-  driverId: z.uuid(),
+  driverId: uuid('Empleado con canDrive = true'),
   dayOfWeek,
-  companionIds: uniqueIdList(MAX_COMPANIONS).default([]),
+  companionIds: uniqueIdList(MAX_COMPANIONS)
+    .default([])
+    .meta({ description: 'Acompañantes (máx. 10)' }),
 });
 export type CreateScheduleDto = z.infer<typeof createScheduleSchema>;
 
@@ -18,17 +26,18 @@ export const updateScheduleSchema = z.strictObject({
   driverId: z.uuid().optional(),
   dayOfWeek: dayOfWeek.optional(),
   isActive: z.boolean().optional(),
-  companionIds: uniqueIdList(MAX_COMPANIONS).optional(),
+  companionIds: uniqueIdList(MAX_COMPANIONS)
+    .optional()
+    .meta({ description: 'Reemplaza la lista completa; [] los quita' }),
 });
 export type UpdateScheduleDto = z.infer<typeof updateScheduleSchema>;
 
 export const listSchedulesQuerySchema = paginationQuerySchema.extend({
-  providerId: z.uuid().optional(),
+  providerId: providerIdQuery(),
   routeId: z.uuid().optional(),
   dayOfWeek: dayOfWeek.optional(),
-  driverId: z.uuid().optional(),
-  /** Asignaciones donde ese empleado participa, como chofer o acompañante. */
-  employeeId: z.uuid().optional(),
+  driverId: uuid('Donde ese empleado es chofer').optional(),
+  employeeId: uuid('Donde ese empleado participa, como chofer o acompañante').optional(),
   isActive: booleanQuery.optional(),
 });
 export type ListSchedulesQuery = z.infer<typeof listSchedulesQuerySchema>;

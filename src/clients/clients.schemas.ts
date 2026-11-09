@@ -3,26 +3,30 @@ import { paginationQuerySchema } from '../common/pagination/pagination.js';
 import {
   booleanQuery,
   optionalText,
+  providerIdQuery,
+  uuid,
   searchQuery,
   sortOrder,
 } from '../common/schemas.js';
 
-const latitude = z.number().min(-90).max(90);
-const longitude = z.number().min(-180).max(180);
+const latitude = z.number().min(-90).max(90).meta({ example: 20.6736 });
+const longitude = z.number().min(-180).max(180).meta({ example: -103.344 });
 /** Radio del geofence en metros: suficiente para un local, sin abarcar media colonia. */
-const geofenceRadiusM = z.number().int().min(10).max(2000);
+const geofenceRadiusM = z.number().int().min(10).max(2000).meta({
+  description: 'Radio en metros dentro del cual se considera que el chofer llegó (100 por defecto)',
+  example: 100,
+});
 const phone = z
   .string()
   .trim()
   .regex(/^\+?[0-9\s-]{7,20}$/, 'Teléfono inválido');
 
 export const createClientSchema = z.strictObject({
-  /** Obligatorio para ADMIN; PROVIDER/SUPERVISOR lo omiten (se usa el suyo). */
-  providerId: z.uuid().optional(),
-  name: z.string().trim().min(1).max(160),
-  contactName: z.string().trim().min(1).max(120).optional(),
-  phone: phone.optional(),
-  address: z.string().trim().min(1).max(300),
+  providerId: z.uuid().optional().meta({ description: 'Obligatorio para ADMIN; PROVIDER/SUPERVISOR lo omiten (se usa el suyo)' }),
+  name: z.string().trim().min(1).max(160).meta({ example: 'Abarrotes La Esperanza' }),
+  contactName: z.string().trim().min(1).max(120).optional().meta({ example: 'Ramiro López' }),
+  phone: phone.optional().meta({ example: '+52 33 1234 5678' }),
+  address: z.string().trim().min(1).max(300).meta({ example: 'Av. Juárez 123, Guadalajara' }),
   latitude,
   longitude,
   geofenceRadiusM: geofenceRadiusM.optional(),
@@ -43,12 +47,12 @@ export const updateClientSchema = z.strictObject({
 export type UpdateClientDto = z.infer<typeof updateClientSchema>;
 
 export const listClientsQuerySchema = paginationQuerySchema.extend({
-  providerId: z.uuid().optional(),
+  providerId: providerIdQuery(),
   isActive: booleanQuery.optional(),
-  /** Solo los clientes que están en esta ruta. */
-  routeId: z.uuid().optional(),
-  /** true: solo clientes que no están en ninguna ruta (pendientes de asignar). */
-  withoutRoute: booleanQuery.optional(),
+  routeId: uuid('Solo los clientes de esta ruta').optional(),
+  withoutRoute: booleanQuery
+    .optional()
+    .meta({ description: 'true: solo clientes que no están en ninguna ruta' }),
   search: searchQuery.optional(),
   sortBy: z.enum(['name', 'createdAt']).default('name'),
   order: sortOrder.default('asc'),

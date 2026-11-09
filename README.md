@@ -29,6 +29,16 @@ npm run start:dev
 
 `POST /auth/login` con el admin devuelve el `accessToken` para el resto de la API (`Authorization: Bearer <token>`).
 
+## Documentación de la API
+
+Con el servidor corriendo:
+
+- **http://localhost:3000/docs**: Swagger UI con todos los endpoints, qué roles pueden usarlos, filtros, cuerpos, respuestas y errores. Botón **Authorize** para probarlos con tu token.
+- **http://localhost:3000/docs/json**: el documento OpenAPI, para generar el cliente del front o de la app móvil.
+- `npm run openapi` genera `openapi.json` sin levantar el servidor ni conectar a la base.
+
+Se desactiva con `SWAGGER_ENABLED=false`.
+
 ## Scripts
 
 | Script | |
@@ -39,6 +49,7 @@ npm run start:dev
 | `npm run typecheck` | TypeScript sin compilar (incluye las pruebas) |
 | `npm test` | Pruebas unitarias |
 | `npm run test:e2e` | Pruebas e2e contra PostgreSQL (ver abajo) |
+| `npm run openapi` | Genera `openapi.json` |
 | `npm run prisma:migrate` | Nueva migración tras cambiar `prisma/schema.prisma` |
 | `npm run prisma:studio` | Explorar la base de datos |
 

@@ -1,29 +1,35 @@
 import { z } from 'zod';
 import { paginationQuerySchema } from '../common/pagination/pagination.js';
-import { booleanQuery, searchQuery } from '../common/schemas.js';
+import {
+  booleanQuery,
+  providerIdQuery,
+  searchQuery,
+  uuid,
+} from '../common/schemas.js';
 import { RouteRunStatus } from '../generated/prisma/enums.js';
 
 /** Fecha 'YYYY-MM-DD' válida. */
-export const dateString = z.iso.date();
+export const dateString = z.iso.date().meta({ example: '2026-11-17' });
 
 export const runStatus = z.enum(RouteRunStatus);
 
 export const listRunsQuerySchema = paginationQuerySchema.extend({
-  providerId: z.uuid().optional(),
-  /** Un día concreto, o un rango con dateFrom/dateTo. */
-  date: dateString.optional(),
-  dateFrom: dateString.optional(),
-  dateTo: dateString.optional(),
+  providerId: providerIdQuery(),
+  date: dateString
+    .optional()
+    .meta({ description: 'Un día concreto (no combinar con dateFrom/dateTo)' }),
+  dateFrom: dateString.optional().meta({ description: 'Desde este día (incluido)' }),
+  dateTo: dateString.optional().meta({ description: 'Hasta este día (incluido)' }),
   routeId: z.uuid().optional(),
-  /** Recorridos donde ese empleado manejó. */
-  driverId: z.uuid().optional(),
-  /** Recorridos donde ese empleado participó, como chofer o acompañante. */
-  employeeId: z.uuid().optional(),
-  /** Busca por nombre de la ruta o del chofer: `?search=jose`. */
-  search: searchQuery.optional(),
+  driverId: uuid('Recorridos donde ese empleado manejó').optional(),
+  employeeId: uuid('Recorridos donde participó, como chofer o acompañante').optional(),
+  search: searchQuery
+    .optional()
+    .meta({ description: 'Nombre del chofer o de la ruta', example: 'jose' }),
   status: runStatus.optional(),
-  /** Solo recorridos con alguna visita marcada para revisión. */
-  hasFlagged: booleanQuery.optional(),
+  hasFlagged: booleanQuery
+    .optional()
+    .meta({ description: 'true: con visitas marcadas para revisión' }),
 })
   .refine((q) => !(q.date && (q.dateFrom || q.dateTo)), {
     message: 'Usa date o el rango dateFrom/dateTo, no ambos',
@@ -34,8 +40,10 @@ export const listRunsQuerySchema = paginationQuerySchema.extend({
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
 
 export const generateRunsSchema = z.strictObject({
-  /** ADMIN sin providerId: todos los proveedores activos. */
-  providerId: z.uuid().optional(),
+  providerId: z
+    .uuid()
+    .optional()
+    .meta({ description: 'ADMIN: sin providerId genera para todos los proveedores' }),
   date: dateString,
 });
 export type GenerateRunsDto = z.infer<typeof generateRunsSchema>;
@@ -91,19 +99,30 @@ export type TrackQuery = z.infer<typeof trackQuerySchema>;
 
 // ───────────── App del chofer ─────────────
 
-const latitude = z.number().min(-90).max(90);
-const longitude = z.number().min(-180).max(180);
+const latitude = z.number().min(-90).max(90).meta({ example: 20.6736 });
+const longitude = z.number().min(-180).max(180).meta({ example: -103.344 });
 
 export const checkInSchema = z.strictObject({
   latitude,
   longitude,
-  accuracyM: z.number().min(0).max(10_000).optional(),
-  notes: z.string().trim().min(1).max(500).optional(),
+  accuracyM: z
+    .number()
+    .min(0)
+    .max(10_000)
+    .optional()
+    .meta({ description: 'Precisión del GPS en metros', example: 12 }),
+  notes: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .optional()
+    .meta({ example: 'GPS débil en el estacionamiento' }),
 });
 export type CheckInDto = z.infer<typeof checkInSchema>;
 
 export const skipVisitSchema = z.strictObject({
-  reason: z.string().trim().min(3).max(500),
+  reason: z.string().trim().min(3).max(500).meta({ example: 'Cerrado' }),
 });
 export type SkipVisitDto = z.infer<typeof skipVisitSchema>;
 

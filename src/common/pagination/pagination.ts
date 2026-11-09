@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 /** Parámetros de paginación comunes: `?page=1&limit=20`. */
 export const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).max(100_000).default(1).meta({ description: 'Página (desde 1)' }),
+  limit: z.coerce.number().int().min(1).max(100).default(20).meta({ description: 'Registros por página (máx. 100)' }),
 });
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;

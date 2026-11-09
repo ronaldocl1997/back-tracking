@@ -8,7 +8,10 @@ describe('App (e2e)', () => {
   });
   afterAll(() => ctx.app.close());
 
-  it('GET / es público', () => ctx.api.get('/').expect(200));
+  it('GET /health es público y revisa la base de datos', async () => {
+    const res = await ctx.api.get('/health').expect(200);
+    expect(res.body).toMatchObject({ status: 'ok', database: 'up' });
+  });
 
   it('todo lo demás exige sesión', async () => {
     await ctx.api.get('/auth/me').expect(401);
