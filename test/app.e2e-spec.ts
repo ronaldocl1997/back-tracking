@@ -22,6 +22,29 @@ describe('App (e2e)', () => {
   it('rechaza un token inválido', () =>
     ctx.api.get('/auth/me', 'no-es-un-jwt').expect(401));
 
+  describe('cabeceras de seguridad (helmet)', () => {
+    it('se envían en las respuestas de la API', async () => {
+      const res = await ctx.api.get('/health').expect(200);
+      expect(res.headers).toMatchObject({
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'SAMEORIGIN',
+        'strict-transport-security': expect.stringContaining('max-age='),
+        'content-security-policy': expect.stringContaining("default-src 'self'"),
+        'referrer-policy': 'no-referrer',
+      });
+    });
+
+    it('no revela la tecnología del servidor', async () => {
+      const res = await ctx.api.get('/health').expect(200);
+      expect(res.headers['x-powered-by']).toBeUndefined();
+    });
+
+    it('también en los errores', async () => {
+      const res = await ctx.api.get('/auth/me').expect(401);
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    });
+  });
+
   describe('CORS', () => {
     const server = () => ctx.app.getHttpServer();
 

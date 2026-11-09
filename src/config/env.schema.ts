@@ -42,6 +42,13 @@ export const envSchema = z.object({
     .default('true')
     .transform((value) => value === 'true'),
 
+  /**
+   * Proxies delante de la API (balanceador, Nginx, Cloudflare…). 0 = conexión
+   * directa. Con 1 o más, la IP del cliente sale de X-Forwarded-For: ponlo solo
+   * si de verdad hay un proxy, o cualquiera podría falsificar su IP.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
+
   /** Peticiones por minuto y por IP en toda la API. */
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
   /** Intentos por minuto y por IP en login y refresh. */

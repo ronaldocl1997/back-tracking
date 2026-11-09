@@ -87,3 +87,13 @@ Todas las variables, con sus valores por defecto, están en [`.env.example`](.en
 | `VISIT_DWELL_SECONDS` | 120 | Tiempo dentro del radio del cliente para confirmar la visita |
 | `VISIT_MAX_ACCURACY_M` | 50 | Lecturas GPS menos precisas no deciden visitas |
 | `PING_RETENTION_DAYS` | 0 | Días que se guarda el trazo GPS (0 = siempre); visitas y recorridos no se borran |
+
+Seguridad HTTP:
+
+| Variable | Defecto | |
+|---|---|---|
+| `CORS_ORIGINS` | `http://localhost:*,http://127.0.0.1:*` | Orígenes del navegador permitidos; `*` = cualquier puerto. En producción, el dominio del panel |
+| `TRUST_PROXY` | 0 | Proxies delante de la API (1 = balanceador o Nginx). Define de dónde sale la IP del cliente para el límite de intentos; no lo subas sin un proxy real |
+| `THROTTLE_AUTH_LIMIT` | 5 | Intentos de login/refresh por minuto y por IP |
+
+Todas las respuestas llevan las cabeceras de seguridad de [helmet](https://helmetjs.github.io/).

@@ -4,7 +4,7 @@ import { PasswordHasher } from '@nestjs/authentication';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
-import { configureApp } from '../src/app.setup.js';
+import { configureApp, type AppSetupOptions } from '../src/app.setup.js';
 import { setupSwagger } from '../src/swagger.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { dayOfWeekOf, localDate } from '../src/common/time.js';
@@ -24,7 +24,10 @@ export function today() {
 }
 
 /** La app completa, configurada como en producción, contra la base de pruebas. */
-export async function createTestApp({ swagger = false } = {}) {
+export async function createTestApp({
+  swagger = false,
+  ...setup
+}: { swagger?: boolean } & AppSetupOptions = {}) {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     // scrypt con costo bajo: las pruebas crean muchas contraseñas.
     .overrideProvider(PasswordHasher)
@@ -32,7 +35,7 @@ export async function createTestApp({ swagger = false } = {}) {
     .compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>();
-  configureApp(app);
+  configureApp(app, setup);
   if (swagger) setupSwagger(app);
   await app.init();
 

@@ -35,6 +35,22 @@ describe('Documentación OpenAPI (e2e)', () => {
     expect(res.text).toContain('swagger-ui');
   });
 
+  it('la interfaz funciona con la Content-Security-Policy de helmet', async () => {
+    const res = await ctx.api.get('/docs/').expect(200);
+    expect(res.headers['content-security-policy']).toContain("script-src 'self'");
+    // La CSP bloquea scripts en línea: todos deben cargarse como archivos del mismo origen…
+    const scripts = [...res.text.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const [, attrs, body] of scripts) {
+      expect(body.trim(), 'script en línea').toBe('');
+      const src = /src="([^"]+)"/.exec(attrs)?.[1];
+      expect(src, 'script sin src').toBeDefined();
+      expect(src!.startsWith('http'), `script externo: ${src}`).toBe(false);
+      // …y existir.
+      await ctx.api.get(new URL(src!, 'http://x/docs/').pathname).expect(200);
+    }
+  });
+
   it('documenta todas las operaciones', () => {
     expect(operations.length).toBeGreaterThanOrEqual(60);
   });
