@@ -1,0 +1,361 @@
+// Modelo de datos de back-tracking.
+//
+// Dos capas:
+//   PLAN      -> Provider, Driver, Client, Route, RouteStop, RouteSchedule (se configura una vez)
+//   EJECUCIÓN -> RouteRun, Visit, LocationPing                            (se genera cada día)
+//
+// Aislamiento por proveedor: Driver, Client, Route y RouteRun llevan providerId.
+// Un proveedor nunca ve registros de otro, aunque se trate de la misma persona o negocio.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  runtime             = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Role {
+  ADMIN
+  /// Dueño o gerente del proveedor: todo lo del proveedor, incluido su equipo.
+  PROVIDER
+  /// Equipo del proveedor: arma rutas, clientes, asignaciones y ve reportes.
+  /// No gestiona usuarios del equipo ni los datos del proveedor.
+  SUPERVISOR
+  /// Chofer o acompañante. Lo que hace cada día lo decide la asignación, no el rol.
+  EMPLOYEE
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum RouteRunStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  /// El día terminó y el chofer nunca lo inició.
+  NOT_STARTED
+}
+
+enum VisitStatus {
+  PENDING
+  VISITED
+  MISSED
+  SKIPPED
+}
+
+enum VisitMethod {
+  AUTO_GEOFENCE
+  MANUAL_CHECKIN
+}
+
+// ───────────────────────────── Identidad ─────────────────────────────
+
+/// Cuenta de acceso. Una persona = un usuario, aunque trabaje para varios proveedores.
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Solo para role = PROVIDER o SUPERVISOR: el proveedor al que pertenece.
+  providerId String?   @db.Uuid
+  provider   Provider? @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  /// Solo para role = EMPLOYEE: un perfil de empleado por cada proveedor para el que trabaja.
+  employeeProfiles     Employee[]
+  refreshTokens        RefreshToken[]
+  refreshTokenFamilies RefreshTokenFamily[]
+  reviewedVisits       Visit[]              @relation("VisitReviews")
+
+  @@index([providerId])
+}
+
+/// Una sesión de la app móvil o web: todos los refresh tokens que salen de un mismo login.
+/// La gestiona @nestjs/authentication a través de PrismaRefreshTokenStore.
+model RefreshTokenFamily {
+  id        String         @id
+  userId    String?        @db.Uuid
+  user      User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime?
+  revoked   Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  tokens    RefreshToken[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  /// SHA-256 del token; el token en claro nunca se guarda.
+  id              String             @id
+  familyId        String
+  family          RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  userId          String             @db.Uuid
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime
+  expiresAt       DateTime
+  familyExpiresAt DateTime
+  usedAt          DateTime?
+  claims          Json?
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+// ───────────────────────────── Plan ─────────────────────────────
+
+model Provider {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  taxId     String?
+  /// Zona horaria IANA; define qué es "lunes" para sus rutas.
+  timezone  String   @default("America/Mexico_City")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  employees Employee[]
+  clients   Client[]
+  routes    Route[]
+  routeRuns RouteRun[]
+}
+
+/// Empleado de UN proveedor: chofer y/o acompañante. Si la persona trabaja para otro
+/// proveedor, ese proveedor tiene su propio registro Employee apuntando al mismo User.
+model Employee {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  providerId    String   @db.Uuid
+  provider      Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  /// Puede ser null: el proveedor da de alta al empleado antes de que tenga cuenta.
+  userId        String?  @db.Uuid
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name          String
+  phone         String?
+  /// Solo quien puede manejar se asigna como chofer; cualquiera puede ser acompañante.
+  canDrive      Boolean  @default(false)
+  licenseNumber String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  drivingSchedules   RouteSchedule[]
+  companionSchedules RouteScheduleCompanion[]
+  drivenRuns         RouteRun[]
+  companionRuns      RouteRunCompanion[]
+  locationPings      LocationPing[]
+
+  @@unique([providerId, userId])
+  @@index([userId])
+}
+
+/// Cliente propio de un proveedor. Si dos proveedores atienden al mismo negocio,
+/// cada uno tiene su propio registro y ninguno sabe del otro.
+model Client {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  providerId      String   @db.Uuid
+  provider        Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  name            String
+  contactName     String?
+  phone           String?
+  address         String
+  latitude        Float
+  longitude       Float
+  /// Radio en metros dentro del cual se considera que el chofer llegó.
+  geofenceRadiusM Int      @default(100)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  routeStops RouteStop[]
+  visits     Visit[]
+
+  @@index([providerId])
+}
+
+model Route {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  providerId  String   @db.Uuid
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stops     RouteStop[]
+  schedules RouteSchedule[]
+  runs      RouteRun[]
+
+  @@unique([providerId, name])
+}
+
+/// Cliente dentro de una ruta, con su orden de visita.
+model RouteStop {
+  id       String @id @default(uuid(7)) @db.Uuid
+  routeId  String @db.Uuid
+  route    Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  clientId String @db.Uuid
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  sequence Int
+
+  @@unique([routeId, clientId])
+  @@index([routeId, sequence])
+}
+
+/// "Los lunes, la ruta X la hace el chofer Y, acompañado por Z y W".
+/// Un chofer puede tener varias rutas el mismo día y una ruta puede tener varios
+/// choferes el mismo día. Cada chofer genera su propio RouteRun y recorre la ruta completa.
+/// Si los clientes se reparten entre choferes, deben ser rutas distintas.
+model RouteSchedule {
+  id         String                   @id @default(uuid(7)) @db.Uuid
+  routeId    String                   @db.Uuid
+  route      Route                    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  driverId   String                   @db.Uuid
+  driver     Employee                 @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  dayOfWeek  DayOfWeek
+  isActive   Boolean                  @default(true)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  companions RouteScheduleCompanion[]
+
+  @@unique([routeId, driverId, dayOfWeek])
+  @@index([routeId, dayOfWeek])
+  @@index([driverId, dayOfWeek])
+}
+
+/// Acompañante planeado para una asignación semanal.
+model RouteScheduleCompanion {
+  id         String        @id @default(uuid(7)) @db.Uuid
+  scheduleId String        @db.Uuid
+  schedule   RouteSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  employeeId String        @db.Uuid
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([scheduleId, employeeId])
+  @@index([employeeId])
+}
+
+// ───────────────────────────── Ejecución ─────────────────────────────
+
+/// Una ruta realizada en una fecha concreta. Se genera cada día desde RouteSchedule.
+model RouteRun {
+  id         String         @id @default(uuid(7)) @db.Uuid
+  /// Copia de route.providerId para filtrar por proveedor sin joins.
+  providerId String         @db.Uuid
+  provider   Provider       @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  routeId    String         @db.Uuid
+  route      Route          @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  driverId   String         @db.Uuid
+  driver     Employee       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  /// Fecha local del proveedor (sin hora).
+  date       DateTime       @db.Date
+  status     RouteRunStatus @default(SCHEDULED)
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  /// Última posición recibida: alimenta el mapa en vivo sin leer LocationPing.
+  lastLatitude  Float?
+  lastLongitude Float?
+  lastAccuracyM Float?
+  lastPingAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  companions    RouteRunCompanion[]
+  visits        Visit[]
+  locationPings LocationPing[]
+
+  @@unique([routeId, driverId, date])
+  @@index([routeId, date])
+  @@index([providerId, date])
+  @@index([driverId, date])
+}
+
+/// Acompañante real de un recorrido. Se copia de RouteScheduleCompanion al generar el
+/// RouteRun y puede cambiarse ese día (alguien faltó, se cubrió con otro).
+model RouteRunCompanion {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  routeRunId String   @db.Uuid
+  routeRun   RouteRun @relation(fields: [routeRunId], references: [id], onDelete: Cascade)
+  employeeId String   @db.Uuid
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  /// false si estaba planeado pero no se presentó.
+  attended   Boolean  @default(true)
+
+  @@unique([routeRunId, employeeId])
+  @@index([employeeId])
+}
+
+model Visit {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  routeRunId   String       @db.Uuid
+  routeRun     RouteRun     @relation(fields: [routeRunId], references: [id], onDelete: Cascade)
+  clientId     String       @db.Uuid
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  /// Orden planeado (copiado de RouteStop al generar el RouteRun).
+  sequence     Int
+  status       VisitStatus  @default(PENDING)
+  method       VisitMethod?
+  arrivedAt    DateTime?
+  departedAt   DateTime?
+  /// Posición real del chofer al registrar la visita.
+  latitude     Float?
+  longitude    Float?
+  /// Distancia en metros entre el chofer y el cliente al registrar la visita.
+  distanceM    Float?
+  /// true si el check-in manual se hizo fuera del geofence: el supervisor lo revisa.
+  flagged      Boolean      @default(false)
+  notes        String?
+  /// Quién revisó o corrigió la visita (supervisor, dueño o admin) y cuándo.
+  reviewedById String?      @db.Uuid
+  reviewedBy   User?        @relation("VisitReviews", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([routeRunId, clientId])
+  @@index([clientId])
+}
+
+/// Punto GPS enviado por la app del chofer. Tabla de alto volumen.
+model LocationPing {
+  id           BigInt    @id @default(autoincrement())
+  /// UUID que genera el celular: si reenvía un lote, no se duplica.
+  clientPingId String    @db.Uuid
+  driverId     String    @db.Uuid
+  driver       Employee  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  routeRunId   String?   @db.Uuid
+  routeRun     RouteRun? @relation(fields: [routeRunId], references: [id], onDelete: SetNull)
+  latitude     Float
+  longitude    Float
+  accuracyM    Float?
+  speedMps     Float?
+  heading      Float?
+  /// Momento en que el teléfono tomó la lectura (puede llegar tarde si no había señal).
+  recordedAt   DateTime
+  receivedAt   DateTime  @default(now())
+
+  @@unique([driverId, clientPingId])
+  @@index([driverId, recordedAt])
+  @@index([routeRunId, recordedAt])
+}
