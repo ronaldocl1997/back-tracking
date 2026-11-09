@@ -27,7 +27,15 @@ export const updateProviderSchema = createProviderSchema.partial().extend({
 export type UpdateProviderDto = z.infer<typeof updateProviderSchema>;
 
 export const listProvidersQuerySchema = paginationQuerySchema.extend({
-  isActive: booleanQuery.optional(),
-  search: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional().meta({
+    description: 'Nombre; coincidencia parcial, sin distinguir mayúsculas',
+  }),
+  taxId: z.string().trim().min(1).optional().meta({
+    description: 'RFC; coincidencia parcial, sin distinguir mayúsculas',
+  }),
+  timezone: z.string().trim().min(1).optional().meta({
+    description: 'Zona horaria exacta (ej. America/Mexico_City)',
+  }),
+  isActive: booleanQuery.optional().meta({ description: '`true` activos, `false` desactivados' }),
 });
 export type ListProvidersQuery = z.infer<typeof listProvidersQuerySchema>;

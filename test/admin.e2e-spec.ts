@@ -19,17 +19,39 @@ describe('Usuarios y proveedores (e2e)', () => {
       await ctx.api.post('/providers', admin, { name: 'X', hack: true }).expect(400);
     });
 
-    it('pagina y busca', async () => {
+    it('pagina y filtra por nombre', async () => {
       const tag = uid();
       for (let i = 0; i < 3; i++) {
         await ctx.api.post('/providers', admin, { name: `Pag ${tag} ${i}` }).expect(201);
       }
       const res = await ctx.api
-        .get(`/providers?search=${tag}&page=2&limit=2`, admin)
+        .get(`/providers?name=${tag.toUpperCase()}&page=2&limit=2`, admin)
         .expect(200);
       expect(res.body.meta).toEqual({ page: 2, limit: 2, total: 3, totalPages: 2 });
       expect(res.body.data).toHaveLength(1);
       await ctx.api.get('/providers?limit=500', admin).expect(400);
+    });
+
+    it('filtra por RFC, zona horaria y estado; trae dueños y totales', async () => {
+      const tag = uid().toUpperCase();
+      const { provider, user } = await createProvider(ctx.api, admin);
+      await ctx.api
+        .patch(`/providers/${provider.id}`, admin, { taxId: `RFC${tag}`, timezone: 'America/Tijuana' })
+        .expect(200);
+
+      const list = async (qs: string) => (await ctx.api.get(`/providers?${qs}`, admin).expect(200)).body.data;
+      const [found] = await list(`taxId=rfc${tag.toLowerCase()}&timezone=America/Tijuana&isActive=true`);
+      expect(found).toMatchObject({
+        id: provider.id,
+        taxId: `RFC${tag}`,
+        owners: [{ id: user.id, isActive: true }],
+        _count: { users: 1, employees: 0, clients: 0, routes: 0 },
+      });
+      expect(await list(`taxId=rfc${tag.toLowerCase()}&isActive=false`)).toEqual([]);
+      expect(await list(`taxId=rfc${tag.toLowerCase()}&timezone=America/Cancun`)).toEqual([]);
+
+      const detail = (await ctx.api.get(`/providers/${provider.id}`, admin).expect(200)).body;
+      expect(detail).toMatchObject({ owners: [{ id: user.id }], _count: { users: 1 } });
     });
 
     it('404 al editar uno inexistente; 400 con un id inválido', async () => {

@@ -17,48 +17,78 @@ import type {
   UpdateProviderDto,
 } from './providers.schemas.js';
 
+const providerSelect = {
+  id: true,
+  name: true,
+  taxId: true,
+  timezone: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  users: {
+    where: { role: 'PROVIDER' },
+    select: { id: true, name: true, email: true, isActive: true },
+    orderBy: { createdAt: 'asc' },
+  },
+  _count: {
+    select: { users: true, employees: true, clients: true, routes: true },
+  },
+} satisfies Prisma.ProviderSelect;
+
+type ProviderRow = Prisma.ProviderGetPayload<{ select: typeof providerSelect }>;
+
+const toProvider = ({ users, ...provider }: ProviderRow) => ({ ...provider, owners: users });
+
 @Injectable()
 export class ProvidersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: ListProvidersQuery) {
+    const contains = (value?: string) =>
+      value ? { contains: value, mode: 'insensitive' as const } : undefined;
     const where: Prisma.ProviderWhereInput = {
       isActive: query.isActive,
-      ...(query.search && {
-        name: { contains: query.search, mode: 'insensitive' },
-      }),
+      name: contains(query.name),
+      taxId: contains(query.taxId),
+      timezone: query.timezone,
     };
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.provider.findMany({
         where,
+        select: providerSelect,
         orderBy: { name: 'asc' },
         ...toPrismaPage(query),
       }),
       this.prisma.provider.count({ where }),
     ]);
-    return paginated(data, total, query);
+    return paginated(data.map(toProvider), total, query);
   }
 
   /** ADMIN ve cualquiera; PROVIDER/SUPERVISOR solo el suyo (otro id responde 403). */
   async findOne(user: AuthUser, id: string) {
     providerScope(user, id);
-    const provider = await this.prisma.provider.findUnique({ where: { id } });
+    const provider = await this.prisma.provider.findUnique({
+      where: { id },
+      select: providerSelect,
+    });
     if (!provider) throw new NotFoundException('Proveedor no encontrado');
-    return provider;
+    return toProvider(provider);
   }
 
-  create(data: CreateProviderDto) {
-    return this.prisma.provider.create({ data });
+  async create(data: CreateProviderDto) {
+    return toProvider(await this.prisma.provider.create({ data, select: providerSelect }));
   }
 
   /** ADMIN edita cualquiera; el dueño (PROVIDER) solo el suyo y sin poder desactivarlo. */
-  update(user: AuthUser, id: string, data: UpdateProviderDto) {
+  async update(user: AuthUser, id: string, data: UpdateProviderDto) {
     providerScope(user, id);
     if (user.role !== 'ADMIN' && data.isActive !== undefined) {
       throw new ForbiddenException('Solo un administrador activa o desactiva proveedores');
     }
     // Si no existe, Prisma lanza P2025 y el filtro global responde 404.
-    return this.prisma.provider.update({ where: { id }, data });
+    return toProvider(
+      await this.prisma.provider.update({ where: { id }, data, select: providerSelect }),
+    );
   }
 }

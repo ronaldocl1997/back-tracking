@@ -30,7 +30,12 @@ export class ProvidersController {
 
   @Can(AccessPolicy, 'admin')
   @Get()
-  @ApiDoc('Listar proveedores', { roles: ['ADMIN'] })
+  @ApiDoc('Listar proveedores', {
+    roles: ['ADMIN'],
+    description:
+      'Los filtros se combinan: nombre y RFC (parciales), zona horaria y estado. ' +
+      'Cada proveedor trae sus dueños (`owners`) y totales de usuarios, empleados, clientes y rutas (`_count`).',
+  })
   @ApiPaginated('Provider')
   @ApiError(400)
   findAll(

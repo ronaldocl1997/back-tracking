@@ -104,6 +104,24 @@ export const Provider = z.object({
   isActive: z.boolean(),
   createdAt: instant(),
   updatedAt: instant(),
+  owners: z
+    .array(
+      z.object({
+        id: id(),
+        name: z.string().meta({ example: 'Ana Ruiz' }),
+        email: z.string().meta({ format: 'email', example: 'ana@empresa.com' }),
+        isActive: z.boolean(),
+      }),
+    )
+    .meta({ description: 'Cuentas dueñas (rol PROVIDER), de la más antigua a la más nueva' }),
+  _count: z
+    .object({
+      users: z.number().int().meta({ example: 3, description: 'Cuentas del equipo (PROVIDER y SUPERVISOR)' }),
+      employees: z.number().int().meta({ example: 12 }),
+      clients: z.number().int().meta({ example: 85 }),
+      routes: z.number().int().meta({ example: 6 }),
+    })
+    .meta({ description: 'Totales, incluidos los registros desactivados' }),
 });
 
 export const Employee = z.object({
