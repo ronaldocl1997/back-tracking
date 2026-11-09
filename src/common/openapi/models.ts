@@ -62,6 +62,14 @@ export const User = z.object({
   role: z.enum(Role),
   isActive: z.boolean(),
   providerId: nullable(id('Solo PROVIDER y SUPERVISOR')),
+  provider: nullable(
+    z.object({
+      id: id(),
+      name: z.string().meta({ example: 'Distribuidora del Norte' }),
+      taxId: nullable(z.string()),
+      isActive: z.boolean(),
+    }),
+  ),
   createdAt: instant(),
   updatedAt: instant(),
 });

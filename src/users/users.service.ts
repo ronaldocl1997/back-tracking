@@ -25,6 +25,14 @@ const userSelect = {
   role: true,
   isActive: true,
   providerId: true,
+  provider: {
+    select: {
+      id: true,
+      name: true,
+      taxId: true,
+      isActive: true,
+    },
+  },
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
