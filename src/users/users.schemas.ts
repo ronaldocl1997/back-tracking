@@ -41,9 +41,13 @@ export const updateUserSchema = z.strictObject({
 export type UpdateUserDto = z.infer<typeof updateUserSchema>;
 
 export const listUsersQuerySchema = paginationQuerySchema.extend({
-  role: role.optional(),
-  providerId: z.uuid().optional(),
-  isActive: booleanQuery.optional(),
-  search: z.string().trim().min(1).optional(),
+  role: role.optional().meta({ description: 'Solo cuentas de este rol' }),
+  providerId: z.uuid().optional().meta({
+    description: 'Solo cuentas de este proveedor (id de `GET /providers`)',
+  }),
+  isActive: booleanQuery.optional().meta({ description: '`true` activas, `false` desactivadas' }),
+  search: z.string().trim().min(1).optional().meta({
+    description: 'Busca en nombre o correo, sin distinguir mayúsculas',
+  }),
 });
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;

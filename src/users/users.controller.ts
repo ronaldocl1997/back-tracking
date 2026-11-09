@@ -31,7 +31,9 @@ export class UsersController {
   @Get()
   @ApiDoc('Listar usuarios', {
     roles: ['ADMIN'],
-    description: 'Todas las cuentas. Filtra por rol, proveedor, estado o busca por nombre/correo.',
+    description:
+      'Todas las cuentas. Filtra por rol, proveedor (`providerId`), estado o busca por nombre/correo. ' +
+      'Cada cuenta trae `provider` con los datos de su empresa (null si no tiene).',
   })
   @ApiPaginated('User')
   @ApiError(400)

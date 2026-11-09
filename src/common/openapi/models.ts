@@ -66,10 +66,10 @@ export const User = z.object({
     z.object({
       id: id(),
       name: z.string().meta({ example: 'Distribuidora del Norte' }),
-      taxId: nullable(z.string()),
+      taxId: nullable(z.string().meta({ example: 'DNO010101AB1' })),
       isActive: z.boolean(),
     }),
-  ),
+  ).meta({ description: 'Empresa del usuario (PROVIDER / SUPERVISOR); null para ADMIN y EMPLOYEE' }),
   createdAt: instant(),
   updatedAt: instant(),
 });
