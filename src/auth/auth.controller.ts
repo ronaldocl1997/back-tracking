@@ -12,8 +12,16 @@ import {
 } from './auth.schemas.js';
 import { AuthService } from './auth.service.js';
 
-/** Máximo 5 intentos por minuto en las rutas públicas de auth (por IP). */
-const AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+/**
+ * Intentos por minuto y por IP en login y refresh (THROTTLE_AUTH_LIMIT, 5 por
+ * defecto). Se lee en cada petición: ConfigModule ya validó y cargó el valor.
+ */
+const AUTH_THROTTLE = {
+  default: {
+    limit: () => Number(process.env.THROTTLE_AUTH_LIMIT ?? 5),
+    ttl: 60_000,
+  },
+};
 
 @Controller('auth')
 export class AuthController {

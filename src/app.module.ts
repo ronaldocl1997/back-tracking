@@ -25,7 +25,12 @@ import { UsersModule } from './users/users.module.js';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validationSchema: envSchema }),
     // Límite general por IP; las rutas de login lo endurecen con @Throttle().
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => [
+        { ttl: 60_000, limit: config.get('THROTTLE_LIMIT', { infer: true }) },
+      ],
+    }),
     PrismaModule,
     ScheduleModule.forRoot(),
 

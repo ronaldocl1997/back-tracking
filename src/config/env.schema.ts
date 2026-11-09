@@ -28,6 +28,11 @@ export const envSchema = z.object({
    * Las visitas y los recorridos nunca se borran: solo el trazo detallado.
    */
   PING_RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
+
+  /** Peticiones por minuto y por IP en toda la API. */
+  THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
+  /** Intentos por minuto y por IP en login y refresh. */
+  THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().default(5),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,29 +1,20 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
-import { App } from 'supertest/types.js';
-import { AppModule } from './../src/app.module.js';
+import { createTestApp } from './helpers.js';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+describe('App (e2e)', () => {
+  let ctx: Awaited<ReturnType<typeof createTestApp>>;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+  beforeAll(async () => {
+    ctx = await createTestApp();
+  });
+  afterAll(() => ctx.app.close());
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+  it('GET / es público', () => ctx.api.get('/').expect(200));
+
+  it('todo lo demás exige sesión', async () => {
+    await ctx.api.get('/auth/me').expect(401);
+    await ctx.api.get('/clients').expect(401);
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
-  });
-
-  afterEach(async () => {
-    await app.close();
-  });
+  it('rechaza un token inválido', () =>
+    ctx.api.get('/auth/me', 'no-es-un-jwt').expect(401));
 });
