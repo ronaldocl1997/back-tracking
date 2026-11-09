@@ -26,6 +26,9 @@ const memberSelect = {
   role: true,
   isActive: true,
   providerId: true,
+  provider: {
+    select: { id: true, name: true, taxId: true, isActive: true },
+  },
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -43,16 +46,15 @@ export class TeamService {
   ) {}
 
   async findAll(user: AuthUser, query: ListTeamQuery) {
+    const contains = (value?: string) =>
+      value ? { contains: value, mode: 'insensitive' as const } : undefined;
     const where: Prisma.UserWhereInput = {
       providerId: providerScope(user, query.providerId) ?? { not: null },
       role: query.role ?? { in: [...PROVIDER_STAFF_ROLES] },
       isActive: query.isActive,
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { email: { contains: query.search, mode: 'insensitive' } },
-        ],
-      }),
+      name: contains(query.name),
+      email: contains(query.email),
+      ...(query.providerName && { provider: { name: contains(query.providerName) } }),
     };
 
     const [data, total] = await this.prisma.$transaction([

@@ -54,6 +54,27 @@ describe('Equipo del proveedor y supervisor (e2e)', () => {
       expect(sups.body.meta.total).toBe(1);
     });
 
+    it('filtra por nombre, correo y nombre del proveedor; trae los datos del proveedor', async () => {
+      const owner = await createProvider(ctx.api, admin);
+      const other = await createProvider(ctx.api, admin);
+      const tag = uid();
+      const sup = (
+        await ctx.api
+          .post('/team', owner.token, { email: `f-${tag}@test.com`, password: PASSWORD, name: `Filtro ${tag}` })
+          .expect(201)
+      ).body;
+      expect(sup.provider).toMatchObject({ id: owner.provider.id, name: owner.provider.name });
+
+      const ids = async (token: string, qs: string) =>
+        (await ctx.api.get(`/team?${qs}`, token).expect(200)).body.data.map((m: { id: string }) => m.id);
+      expect(await ids(owner.token, `name=${tag.toUpperCase()}`)).toEqual([sup.id]);
+      expect(await ids(owner.token, `email=f-${tag}`)).toEqual([sup.id]);
+      expect(await ids(owner.token, `name=${tag}&role=PROVIDER`)).toEqual([]);
+      expect(await ids(admin, `providerName=${encodeURIComponent(owner.provider.name.toLowerCase())}&role=SUPERVISOR`)).toEqual([sup.id]);
+      // El dueño no ve otro proveedor aunque lo busque por nombre.
+      expect(await ids(other.token, `providerName=${encodeURIComponent(owner.provider.name)}`)).toEqual([]);
+    });
+
     it('no puede desactivarse ni quitarse el rol de dueño a sí mismo', async () => {
       const owner = await createProvider(ctx.api, admin);
       await ctx.api.patch(`/team/${owner.user.id}`, owner.token, { isActive: false }).expect(400);

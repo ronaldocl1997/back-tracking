@@ -35,7 +35,10 @@ export class TeamController {
   @Get()
   @ApiDoc('Listar el equipo', {
     roles: OWNER,
-    description: 'Dueños y supervisores del proveedor. El ADMIN ve todos o filtra con `providerId`.',
+    description:
+      'Dueños y supervisores del proveedor. El dueño solo ve el suyo; el ADMIN ve todos o filtra por ' +
+      'proveedor (`providerId` exacto o `providerName` parcial). Los filtros se combinan: rol, estado, ' +
+      'nombre y correo (parciales). Cada miembro trae `provider` con los datos de su empresa.',
   })
   @ApiPaginated('User')
   @ApiError(400)
