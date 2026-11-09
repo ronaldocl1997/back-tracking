@@ -29,6 +29,13 @@ export const envSchema = z.object({
    */
   PING_RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
 
+  /**
+   * Orígenes del navegador que pueden llamar a la API, separados por coma.
+   * `*` en lugar del puerto acepta cualquiera. En producción, el dominio del panel:
+   * CORS_ORIGINS=https://panel.tuempresa.com
+   */
+  CORS_ORIGINS: z.string().default('http://localhost:*,http://127.0.0.1:*'),
+
   /** Documentación Swagger en /docs (y /docs/json). Desactívala si la API es pública y no quieres exponerla. */
   SWAGGER_ENABLED: z
     .enum(['true', 'false'])
