@@ -45,9 +45,15 @@ export const listUsersQuerySchema = paginationQuerySchema.extend({
   providerId: z.uuid().optional().meta({
     description: 'Solo cuentas de este proveedor (id de `GET /providers`)',
   }),
+  providerName: z.string().trim().min(1).optional().meta({
+    description: 'Nombre del proveedor; coincidencia parcial, sin distinguir mayúsculas',
+  }),
   isActive: booleanQuery.optional().meta({ description: '`true` activas, `false` desactivadas' }),
-  search: z.string().trim().min(1).optional().meta({
-    description: 'Busca en nombre o correo, sin distinguir mayúsculas',
+  name: z.string().trim().min(1).optional().meta({
+    description: 'Nombre del usuario; coincidencia parcial, sin distinguir mayúsculas',
+  }),
+  email: z.string().trim().min(1).optional().meta({
+    description: 'Correo; coincidencia parcial, sin distinguir mayúsculas',
   }),
 });
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;

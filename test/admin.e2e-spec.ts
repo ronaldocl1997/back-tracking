@@ -101,7 +101,7 @@ describe('Usuarios y proveedores (e2e)', () => {
       await ctx.api.post('/users', admin, body).expect(409);
     });
 
-    it('filtra por rol y busca', async () => {
+    it('filtra por rol, nombre y correo', async () => {
       const tag = uid();
       await ctx.api
         .post('/users', admin, {
@@ -111,8 +111,23 @@ describe('Usuarios y proveedores (e2e)', () => {
           role: 'ADMIN',
         })
         .expect(201);
-      const res = await ctx.api.get(`/users?role=ADMIN&search=${tag}`, admin).expect(200);
-      expect(res.body.data.map((u: { name: string }) => u.name)).toEqual([`Filtro ${tag}`]);
+      const names = async (qs: string) =>
+        (await ctx.api.get(`/users?${qs}`, admin).expect(200)).body.data.map((u: { name: string }) => u.name);
+      expect(await names(`role=ADMIN&name=${tag.toUpperCase()}`)).toEqual([`Filtro ${tag}`]);
+      expect(await names(`email=f-${tag}`)).toEqual([`Filtro ${tag}`]);
+      expect(await names(`name=${tag}&email=otro`)).toEqual([]);
+    });
+
+    it('filtra por nombre del proveedor y trae sus datos', async () => {
+      const { provider, user } = await createProvider(ctx.api, admin);
+      const res = await ctx.api
+        .get(`/users?providerName=${encodeURIComponent(provider.name.toLowerCase())}`, admin)
+        .expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0]).toMatchObject({
+        id: user.id,
+        provider: { id: provider.id, name: provider.name },
+      });
     });
 
     it('cambiar la contraseña cierra sus sesiones', async () => {

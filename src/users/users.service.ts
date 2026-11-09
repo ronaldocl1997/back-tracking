@@ -46,16 +46,15 @@ export class UsersService {
   ) {}
 
   async findAll(query: ListUsersQuery) {
+    const contains = (value?: string) =>
+      value ? { contains: value, mode: 'insensitive' as const } : undefined;
     const where: Prisma.UserWhereInput = {
       role: query.role,
       providerId: query.providerId,
       isActive: query.isActive,
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { email: { contains: query.search, mode: 'insensitive' } },
-        ],
-      }),
+      name: contains(query.name),
+      email: contains(query.email),
+      ...(query.providerName && { provider: { name: contains(query.providerName) } }),
     };
 
     const [data, total] = await this.prisma.$transaction([
