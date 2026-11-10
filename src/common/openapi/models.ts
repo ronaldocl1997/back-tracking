@@ -127,6 +127,11 @@ export const Provider = z.object({
 export const Employee = z.object({
   id: id(),
   providerId: id(),
+  provider: z.object({
+    id: id(),
+    name: z.string().meta({ example: 'Distribuidora del Norte' }),
+    isActive: z.boolean(),
+  }),
   name: z.string().meta({ example: 'José Pérez' }),
   phone: nullable(z.string().meta({ example: '+52 33 1234 5678' })),
   canDrive: z.boolean().meta({ description: 'Puede asignarse como chofer' }),

@@ -31,6 +31,7 @@ const employeeSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  provider: { select: { id: true, name: true, isActive: true } },
   user: { select: { id: true, email: true, isActive: true } },
 } satisfies Prisma.EmployeeSelect;
 
@@ -42,6 +43,8 @@ export class EmployeesService {
   ) {}
 
   async findAll(user: AuthUser, query: ListEmployeesQuery) {
+    const contains = (value?: string) =>
+      value ? { contains: value, mode: 'insensitive' as const } : undefined;
     const where: Prisma.EmployeeWhereInput = {
       providerId: providerScope(user, query.providerId),
       isActive: query.isActive,
@@ -49,13 +52,11 @@ export class EmployeesService {
       ...(query.hasAccount !== undefined && {
         userId: query.hasAccount ? { not: null } : null,
       }),
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { phone: { contains: query.search } },
-          { licenseNumber: { contains: query.search, mode: 'insensitive' } },
-        ],
-      }),
+      name: contains(query.name),
+      phone: contains(query.phone),
+      licenseNumber: contains(query.licenseNumber),
+      ...(query.email && { user: { email: contains(query.email) } }),
+      ...(query.providerName && { provider: { name: contains(query.providerName) } }),
     };
 
     const [data, total] = await this.prisma.$transaction([

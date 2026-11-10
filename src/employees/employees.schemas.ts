@@ -5,9 +5,11 @@ import {
   booleanQuery,
   optionalText,
   providerIdQuery,
-  searchQuery,
   sortOrder,
 } from '../common/schemas.js';
+
+const partial = (description: string) =>
+  z.string().trim().min(1).optional().meta({ description });
 
 const phone = z
   .string()
@@ -38,14 +40,18 @@ export type UpdateEmployeeDto = z.infer<typeof updateEmployeeSchema>;
 
 export const listEmployeesQuerySchema = paginationQuerySchema.extend({
   providerId: providerIdQuery(),
-  isActive: booleanQuery.optional(),
+  isActive: booleanQuery.optional().meta({ description: '`true` activos, `false` dados de baja' }),
   canDrive: booleanQuery.optional().meta({ description: 'true: solo choferes' }),
   hasAccount: booleanQuery
     .optional()
     .meta({ description: 'true: con cuenta para la app; false: sin cuenta' }),
-  search: searchQuery.optional(),
-  sortBy: z.enum(['name', 'createdAt']).default('name'),
-  order: sortOrder.default('asc'),
+  providerName: partial('Nombre del proveedor; coincidencia parcial, sin distinguir mayúsculas'),
+  name: partial('Nombre; coincidencia parcial, sin distinguir mayúsculas'),
+  phone: partial('Teléfono; coincidencia parcial, tal como se guardó (con espacios o guiones)'),
+  licenseNumber: partial('Licencia; coincidencia parcial, sin distinguir mayúsculas'),
+  email: partial('Correo de su cuenta para la app; coincidencia parcial, sin distinguir mayúsculas'),
+  sortBy: z.enum(['name', 'createdAt']).default('name').meta({ description: 'Campo para ordenar' }),
+  order: sortOrder.default('asc').meta({ description: '`asc` o `desc`' }),
 });
 export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;
 

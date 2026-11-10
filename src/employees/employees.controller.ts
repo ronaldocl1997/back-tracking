@@ -50,7 +50,10 @@ export class EmployeesController {
   @Get()
   @ApiDoc('Listar empleados', {
     roles: MANAGE,
-    description: 'Filtra por `canDrive` (choferes), `hasAccount` (con cuenta para la app), estado, o busca por nombre, teléfono o licencia.',
+    description:
+      'Los filtros se combinan: `canDrive` (choferes), `hasAccount` (con cuenta para la app), estado, ' +
+      'nombre, teléfono, licencia, correo de la cuenta y proveedor (`providerId` exacto o `providerName` parcial, solo ADMIN). ' +
+      'Cada empleado trae `provider` y su cuenta (`user`).',
   })
   @ApiPaginated('Employee')
   @ApiError(400)

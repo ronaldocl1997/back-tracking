@@ -57,9 +57,29 @@ describe('Catálogo del proveedor (e2e)', () => {
     it('filtra, busca y ordena', async () => {
       const drivers = await ctx.api.get('/employees?canDrive=true&sortBy=name', p1.token).expect(200);
       expect(drivers.body.data.map((e: { name: string }) => e.name)).toEqual(['Juan Chofer', 'Mario Chofer']);
-      const search = await ctx.api.get('/employees?search=pedro', p1.token).expect(200);
-      expect(search.body.meta.total).toBe(1);
       await ctx.api.get('/employees?sortBy=password', p1.token).expect(400);
+    });
+
+    it('filtra por campo y trae el proveedor', async () => {
+      const names = async (token: string, qs: string) =>
+        (await ctx.api.get(`/employees?${qs}`, token).expect(200)).body.data.map((e: { name: string }) => e.name);
+      expect(await names(p1.token, 'name=PEDRO')).toEqual(['Pedro Ayudante']);
+      expect(await names(p1.token, 'phone=1234')).toEqual(['Juan Chofer']);
+      expect(await names(p1.token, 'licenseNumber=lic-1')).toEqual(['Juan Chofer']);
+      expect(await names(p1.token, 'name=juan&canDrive=false')).toEqual([]);
+
+      const email = `emp-${uid()}@test.com`;
+      const withAccount = (await createEmployee(ctx.api, p2.token, { name: 'Correo P2' })).employee;
+      await ctx.api.post(`/employees/${withAccount.id}/account`, p2.token, { email, password: PASSWORD }).expect(201);
+      expect(await names(p2.token, `email=${email.toUpperCase()}`)).toEqual(['Correo P2']);
+      expect(await names(p1.token, `email=${email}`)).toEqual([]);
+
+      const p2Name = encodeURIComponent(p2.provider.name.toLowerCase());
+      expect(await names(admin, `providerName=${p2Name}`)).toEqual(['Correo P2', 'Empleado P2']);
+      expect(await names(p1.token, `providerName=${p2Name}`)).toEqual([]);
+
+      const one = (await ctx.api.get(`/employees/${ids.driver}`, p1.token).expect(200)).body;
+      expect(one.provider).toEqual({ id: p1.provider.id, name: p1.provider.name, isActive: true });
     });
 
     it('no ve empleados de otro proveedor (404, no 403)', () =>
